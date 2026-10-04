@@ -1,0 +1,110 @@
+﻿<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+    <Fragment>
+        <UI Id="M2InstallerUI">
+            <TextStyle Id="WixUI_Font_Normal" FaceName="Tahoma" Size="8"/>
+            <TextStyle Id="WixUI_Font_Bigger" FaceName="Tahoma" Size="12"/>
+            <TextStyle Id="WixUI_Font_Title" FaceName="Tahoma" Size="9" Bold="yes"/>
+            <Property Id="DefaultUIFont" Value="WixUI_Font_Normal"/>
+            <DialogRef Id="BrowseDlg"/>
+            <DialogRef Id="DiskCostDlg"/>
+            <DialogRef Id="ErrorDlg"/>
+            <DialogRef Id="FatalError"/>
+            <DialogRef Id="FilesInUse"/>
+            <DialogRef Id="MsiRMFilesInUse"/>
+            <DialogRef Id="PrepareDlg"/>
+            <DialogRef Id="ProgressDlg"/>
+            <DialogRef Id="ResumeDlg"/>
+            <DialogRef Id="UserExit"/>
+            <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="InstallDirDlg"
+                     Condition="NOT Installed"/>
+            <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg"
+                     Condition="Installed AND PATCH"/>
+            <Publish Dialog="InstallDirDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg"/>
+            <Publish Dialog="InstallDirDlg" Control="Next" Event="CheckTargetPath" Value="[WIXUI_INSTALLDIR]"
+                     Order="1"/>
+            <Publish Dialog="InstallDirDlg" Control="Next" Event="SetTargetPath" Value="[WIXUI_INSTALLDIR]" Order="2"/>
+            <Publish Dialog="InstallDirDlg" Control="Next" Event="NewDialog" Value="ShortcutsDlg" Order="3"/>
+            <Publish Dialog="InstallDirDlg" Control="ChangeFolder" Property="_BrowseProperty" Value="[WIXUI_INSTALLDIR]"
+                     Order="1"/>
+            <Publish Dialog="InstallDirDlg" Control="ChangeFolder" Event="SpawnDialog" Value="BrowseDlg" Order="2"/>
+            <Publish Dialog="BrowseDlg" Control="OK" Event="CheckTargetPath" Value="[WIXUI_INSTALLDIR]" Order="1"/>
+            <Publish Dialog="BrowseDlg" Control="OK" Event="SetTargetPath" Value="[_BrowseProperty]" Order="2"/>
+            <Publish Dialog="BrowseDlg" Control="OK" Event="EndDialog" Value="Return" Order="3"/>
+            <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="ShortcutsDlg"
+                     Condition="NOT Installed" Order="1"/>
+            <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="MaintenanceTypeDlg"
+                     Condition="Installed AND NOT PATCH AND REMOVE &lt;&gt; &quot;ALL&quot;" Order="2"/>
+            <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="UninstallOptionsDlg"
+                     Condition="Installed AND NOT PATCH AND REMOVE = &quot;ALL&quot;" Order="4"/>
+            <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg"
+                     Condition="Installed AND PATCH" Order="3"/>
+            <Publish Dialog="MaintenanceWelcomeDlg" Control="Next" Event="NewDialog" Value="MaintenanceTypeDlg"/>
+            <Publish Dialog="MaintenanceTypeDlg" Control="Back" Event="NewDialog" Value="MaintenanceWelcomeDlg"/>
+            <Publish Dialog="MaintenanceTypeDlg" Control="RepairButton" Event="NewDialog" Value="VerifyReadyDlg"/>
+            <Publish Dialog="MaintenanceTypeDlg" Control="RemoveButton" Event="NewDialog" Value="UninstallOptionsDlg"/>
+            <!-- The full-UI maintenance Remove button opens this dialog before confirmation.
+                 Basic/silent uninstalls skip the wizard and use M2_PRESERVE_CONFIG directly. -->
+            <Dialog Id="UninstallOptionsDlg" Width="370" Height="270" Title="[ProductName] Setup">
+                <Control Id="Title" Type="Text" X="15" Y="15" Width="340" Height="25" Transparent="yes" NoPrefix="yes"
+                         Text="{\WixUI_Font_Title}Uninstall M2 Server"/>
+                <Control Id="Description" Type="Text" X="20" Y="55" Width="330" Height="45"
+                         Text="Choose whether to keep configuration for all users when M2 Server is removed."/>
+                <Control Id="PreserveConfig" Type="CheckBox" X="20" Y="110" Width="330" Height="18"
+                         Property="M2_KEEP_CONFIG_CHECKED" CheckBoxValue="1" Text="Preserve users' configuration"/>
+                <Control Id="Explanation" Type="Text" X="20" Y="145" Width="330" Height="65"
+                         Text="Keep this checked to reuse profiles, scripts, and settings after reinstalling. Uncheck it to delete all users' M2 Server application data. The application, service, startup task, and firewall rules are removed either way."/>
+                <Control Id="Line" Type="Line" X="0" Y="234" Width="370" Height="1"/>
+                <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="&lt; Back">
+                    <Publish Event="NewDialog" Value="MaintenanceTypeDlg"/>
+                </Control>
+                <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes"
+                         Text="Next &gt;">
+                    <Publish Property="M2_PRESERVE_CONFIG" Value="1" Condition="M2_KEEP_CONFIG_CHECKED" Order="1"/>
+                    <Publish Property="M2_PRESERVE_CONFIG" Value="0" Condition="NOT M2_KEEP_CONFIG_CHECKED" Order="2"/>
+                    <Publish Event="NewDialog" Value="VerifyReadyDlg" Order="3"/>
+                </Control>
+                <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes"
+                         Text="Cancel">
+                    <Publish Event="SpawnDialog" Value="CancelDlg"/>
+                </Control>
+            </Dialog>
+            <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="SetLaunchTrayTarget" Order="1"
+                     Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = &quot;1&quot; AND NOT Installed"/>
+            <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchTray" Order="2"
+                     Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = &quot;1&quot; AND NOT Installed"/>
+            <Publish Dialog="ExitDialog" Control="Finish" Event="EndDialog" Value="Return" Order="999"/>
+            <Dialog Id="ShortcutsDlg" Width="370" Height="270" Title="[ProductName] Setup">
+                <Control Id="Title" Type="Text" X="15" Y="15" Width="340" Height="25" Transparent="yes" NoPrefix="yes"
+                         Text="{\WixUI_Font_Title}Choose shortcuts"/>
+                <Control Id="Description" Type="Text" X="20" Y="55" Width="330" Height="35"
+                         Text="Choose where to add shortcuts that open M2 Server."/>
+                <Control Id="StartMenu" Type="CheckBox" X="20" Y="105" Width="330" Height="18"
+                         Property="M2_STARTMENU_CHECKED" CheckBoxValue="1" Text="Add a Start menu shortcut"/>
+                <Control Id="Desktop" Type="CheckBox" X="20" Y="135" Width="330" Height="18"
+                         Property="M2_DESKTOP_CHECKED"
+                         CheckBoxValue="1" Text="Add a desktop shortcut"/>
+                <Control Id="Line" Type="Line" X="0" Y="234" Width="370" Height="1"/>
+                <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="&lt; Back">
+                    <Publish Event="NewDialog" Value="InstallDirDlg"/>
+                </Control>
+                <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes"
+                         Text="Next &gt;">
+                    <Publish Property="STARTMENU_SHORTCUT" Value="1" Condition="M2_STARTMENU_CHECKED" Order="1"/>
+                    <Publish Property="STARTMENU_SHORTCUT" Value="0" Condition="NOT M2_STARTMENU_CHECKED" Order="2"/>
+                    <Publish Property="DESKTOP_SHORTCUT" Value="1" Condition="M2_DESKTOP_CHECKED" Order="3"/>
+                    <Publish Property="DESKTOP_SHORTCUT" Value="0" Condition="NOT M2_DESKTOP_CHECKED" Order="4"/>
+                    <Publish Event="AddLocal" Value="StartMenuFeature" Condition="M2_STARTMENU_CHECKED" Order="5"/>
+                    <Publish Event="Remove" Value="StartMenuFeature" Condition="NOT M2_STARTMENU_CHECKED" Order="6"/>
+                    <Publish Event="AddLocal" Value="DesktopFeature" Condition="M2_DESKTOP_CHECKED" Order="7"/>
+                    <Publish Event="Remove" Value="DesktopFeature" Condition="NOT M2_DESKTOP_CHECKED" Order="8"/>
+                    <Publish Event="NewDialog" Value="VerifyReadyDlg" Order="9"/>
+                </Control>
+                <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes"
+                         Text="Cancel">
+                    <Publish Event="SpawnDialog" Value="CancelDlg"/>
+                </Control>
+            </Dialog>
+        </UI>
+        <UIRef Id="WixUI_Common"/>
+    </Fragment>
+</Wix>

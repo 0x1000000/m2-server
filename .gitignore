@@ -1,0 +1,55 @@
+# .NET build and publish output
+**/bin/
+**/obj/
+/out/
+artifacts/
+
+# Local test and generated data
+/.tmp/
+**/.tmp/
+**/smoke-data/
+**/smoke-ca.cer
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+
+# User-specific IDE state
+/.vs/
+/.idea/
+/.run/*
+!/.run/Publish M2 Server release.run.xml
+!/.run/Build M2 Server installer.run.xml
+*.suo
+*.user
+*.rsuser
+*.sln.docstates
+*.DotSettings.user
+
+# Temporary and backup files
+*.tmp
+*.bak
+*.userosscache
+*.sln.cache
+
+# Node and Angular generated output
+**/node_modules/
+web/dist/
+web/out-tsc/
+web/bazel-out/
+web/.angular/cache/
+web/coverage/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Logs
+*.log
+
+# Operating-system metadata
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+AGENTS.md
+.run/

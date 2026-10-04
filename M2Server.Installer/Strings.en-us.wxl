@@ -1,0 +1,5 @@
+﻿<WixLocalization xmlns="http://wixtoolset.org/schemas/v4/wxl" Culture="en-us">
+    <UI Dialog="ExitDialog" Control="OptionalCheckBox" X="20" Y="243" Width="150" Height="17"/>
+    <String Id="VerifyReadyDlgRemoveText"
+            Value="Removal permanently deletes M2 Server data for every local user and removes its service, startup task, and firewall rules. Click Remove to continue or Cancel to keep the installation."/>
+</WixLocalization>

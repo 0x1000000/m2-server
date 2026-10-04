@@ -1,0 +1,24 @@
+﻿<Project Sdk="WixToolset.Sdk/7.0.0">
+    <PropertyGroup>
+        <InstallerPlatform>x64</InstallerPlatform>
+        <DebugType>none</DebugType>
+        <OutputName>M2Server-$(ProjectVersion)-x64</OutputName>
+        <OutputPath>$(MSBuildThisFileDirectory)..\.tmp\publish\installer\</OutputPath>
+        <Cultures>en-us</Cultures>
+        <PayloadDir>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\out'))</PayloadDir>
+        <!-- Fixed product namespace; the final bytes encode the MSI version (8/8/16 bits). -->
+        <InstallerVersionMajor>$([System.Version]::Parse('$(ProjectVersion)').Major.ToString('X2'))</InstallerVersionMajor>
+        <InstallerVersionMinor>$([System.Version]::Parse('$(ProjectVersion)').Minor.ToString('X2'))</InstallerVersionMinor>
+        <InstallerVersionPatch>$([System.Version]::Parse('$(ProjectVersion)').Build.ToString('X4'))</InstallerVersionPatch>
+        <InstallerProductCode>AF209CD1-78E2-4C1A-A747-0000$(InstallerVersionMajor)$(InstallerVersionMinor)$(InstallerVersionPatch)</InstallerProductCode>
+        <DefineConstants>ProjectVersion=$(ProjectVersion);ProductCode=$(InstallerProductCode);ProductName=$(Product);PublisherName=$(Company);PayloadDir=$(PayloadDir)</DefineConstants>
+        <AcceptEula>wix7</AcceptEula>
+    </PropertyGroup>
+    <ItemGroup>
+        <PackageReference Include="WixToolset.UI.wixext" Version="7.0.0"/>
+        <PackageReference Include="WixToolset.Util.wixext" Version="7.0.0"/>
+    </ItemGroup>
+    <Target Name="CheckInstallerPayload" BeforeTargets="BeforeBuild">
+        <Error Condition="!Exists('$(PayloadDir)\M2Server.Web.exe') Or !Exists('$(PayloadDir)\M2Server.App.exe') Or !Exists('$(PayloadDir)\M2Server.Tray.exe')" Text="Run the Publish M2 Server release configuration before building the installer."/>
+    </Target>
+</Project>

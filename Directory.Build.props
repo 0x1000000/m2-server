@@ -1,0 +1,19 @@
+<Project>
+    <Import Project="$(MSBuildThisFileDirectory)Version.props"/>
+    <PropertyGroup>
+        <Version>$(ProjectVersion)</Version>
+        <InformationalVersion>$(ProjectVersion)</InformationalVersion>
+        <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+        <AssemblyVersion>$(ProjectVersion).0</AssemblyVersion>
+        <FileVersion>$(ProjectVersion).0</FileVersion>
+        <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory).tmp\obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
+        <BaseOutputPath>$(MSBuildThisFileDirectory).tmp\bin\$(MSBuildProjectName)\</BaseOutputPath>
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    </PropertyGroup>
+    <Target Name="ValidateProjectVersion" BeforeTargets="PrepareForBuild">
+        <Error Condition="!$([System.Text.RegularExpressions.Regex]::IsMatch('$(ProjectVersion)', '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'))"
+               Text="ProjectVersion must be Major.Minor.Patch."/>
+        <Error Condition="$([System.Version]::Parse('$(ProjectVersion)').Major) &gt; 255 Or $([System.Version]::Parse('$(ProjectVersion)').Minor) &gt; 255 Or $([System.Version]::Parse('$(ProjectVersion)').Build) &gt; 65535"
+               Text="ProjectVersion exceeds MSI limits (255.255.65535)."/>
+    </Target>
+</Project>

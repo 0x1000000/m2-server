@@ -1,0 +1,9 @@
+<Solution>
+    <Project Path="M2Server.App/M2Server.App.csproj"/>
+    <Project Path="M2Server.Lib/M2Server.Lib.csproj"/>
+    <Project Path="M2Server.Web/M2Server.Web.csproj"/>
+    <Project Path="M2Server.Installer/M2Server.Installer.wixproj">
+        <Build Project="false"/>
+    </Project>
+    <Project Path="tests/M2Server.Lib.UnitTests/M2Server.Lib.UnitTests.csproj"/>
+</Solution>

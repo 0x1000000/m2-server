@@ -1,0 +1,7 @@
+﻿<Project>
+    <PropertyGroup>
+        <ProjectVersion>1.0.0</ProjectVersion>
+        <Product>M2 Server</Product>
+        <Company>0x1000000</Company>
+    </PropertyGroup>
+</Project>

@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <OutputType>Exe</OutputType>
+        <EnableNUnitRunner>true</EnableNUnitRunner>
+        <IsTestProject>true</IsTestProject>
+        <IsPackable>false</IsPackable>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+    </PropertyGroup>
+    <ItemGroup>
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1"/>
+        <PackageReference Include="NUnit" Version="4.1.0"/>
+        <PackageReference Include="NUnit3TestAdapter" Version="5.2.0"/>
+        <ProjectReference Include="..\..\M2Server.Lib\M2Server.Lib.csproj"/>
+    </ItemGroup>
+    <ItemGroup>
+        <Compile Include="..\..\M2Server.App\UI\SettingsViewState.cs">
+            <Link>SettingsViewState.cs</Link>
+        </Compile>
+    </ItemGroup>
+    <Target Name="CopyNUnitAdapter" AfterTargets="Build">
+        <Copy SourceFiles="$(NuGetPackageRoot)nunit3testadapter/5.2.0/build/netcoreapp3.1/NUnit3.TestAdapter.dll"
+              DestinationFolder="$(TargetDir)"/>
+    </Target>
+</Project>

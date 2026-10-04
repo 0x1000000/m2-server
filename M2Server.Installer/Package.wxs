@@ -1,0 +1,235 @@
+﻿<!--
+    This is WiX source (.wxs): an XML domain-specific language (DSL) for describing
+    a Windows Installer package (.msi). The WiX compiler/linker turns these declarations
+    into MSI database tables; Windows Installer later reads those tables to install,
+    repair, upgrade, or remove the product. XML nesting describes ownership, not the
+    chronological execution order. Actions run according to sequence declarations.
+
+    The project uses WiX SDK 7; the v4 XML namespace is still the schema namespace
+    used by this source. M2Server.Installer.wixproj supplies the x64 platform, extensions,
+    and build-time definitions. Version.props supplies the shared product/version values.
+
+    Three different syntaxes appear inside XML attributes:
+      $(ProductName), $(PayloadDir), etc.: WiX preprocessor values substituted at build
+        time from the wixproj DefineConstants. $(sys.BUILDARCHSHORT) is a WiX system
+        value used to select the matching architecture of the extension custom-action DLL.
+      [INSTALLFOLDER], [ProductName], etc.: MSI formatted-string property references,
+        resolved on the user's machine at install time in attributes that support formatting.
+      Condition="...": MSI condition expressions, not C# or PowerShell. AND, NOT,
+        equality (=), and inequality (<>) combine property/state checks. A bare property
+        checks whether it has a nonempty value; the string "0" is not an unset property.
+        XML escapes &quot; and &lt; decode to a quote and a less-than sign before evaluation.
+
+    Id gives a declaration its internal name. Ref attributes/elements connect to those
+    names, including declarations in other .wxs files or linked WiX extensions.
+    Uppercase property names are public MSI properties (also usable on the msiexec command
+    line). Secure="yes" allows listed public properties to cross into elevated execution;
+    it does not encrypt them. Directory IDs also identify runtime directory properties.
+
+    Main structure: package identity and options; remembered preferences; directories and
+    components; selectable features/payload; uninstall actions; reference to the wizard UI.
+    Schema reference: https://docs.firegiant.com/wix/schema/wxs/
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+    <!--
+        Package is the MSI product. ProductCode identifies this product version; the wixproj
+        derives it from ProjectVersion. UpgradeCode identifies the product family across
+        versions and must remain stable for upgrades to find old installations.
+        perMachine installs for the machine and requires administrative authorization.
+        Language 1033 is English (United States), the MSI language identifier.
+    -->
+    <Package Name="$(ProductName)" Manufacturer="$(PublisherName)" Version="$(ProjectVersion)"
+             ProductCode="$(ProductCode)"
+             UpgradeCode="43C7F3C8-3294-4C8F-92CF-B75F2A23A0D1" Scope="perMachine" Language="1033">
+        <!--
+            MajorUpgrade finds related products, blocks downgrades, and removes the old MSI.
+            afterInstallInitialize puts old-product removal inside the transaction so a failed
+            upgrade can roll it back. This is different from an explicit user uninstall:
+            the cleanup conditions below intentionally preserve app data during upgrades.
+        -->
+        <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed."
+                      Schedule="afterInstallInitialize"/>
+        <!-- Embed compressed payload cabinets in the MSI so it can be distributed as one file. -->
+        <MediaTemplate EmbedCab="yes"/>
+        <!-- Icon is an embedded MSI resource; ARPPRODUCTICON selects it for Installed Apps. -->
+        <Icon Id="ProductIcon" SourceFile="..\M2Server.App\Assets\mm.ico"/>
+        <Property Id="ARPPRODUCTICON" Value="ProductIcon"/>
+        <!-- Hide the Installed Apps Modify option; this does not disable repair or removal. -->
+        <Property Id="ARPNOMODIFY" Value="1"/>
+        <!-- Uninstall preserves configuration by default. The wizard maps its checkbox to
+             this public property: "1" (keep) or "0" (delete). Silent uninstall callers
+             can explicitly pass M2_PRESERVE_CONFIG=0 to request deletion. Secure carries
+             the choice from the wizard into the elevated execution sequence. -->
+        <Property Id="M2_PRESERVE_CONFIG" Value="1" Secure="yes"/>
+        <SetProperty Id="M2_KEEP_CONFIG_CHECKED" Value="1" After="CostFinalize" Sequence="ui"
+                     Condition="M2_PRESERVE_CONFIG = &quot;1&quot;"/>
+        <!-- The wizard's directory selector edits the directory whose ID is INSTALLFOLDER. -->
+        <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER"/>
+        <!-- Finish-page checkbox defaults to checked. UI.wxs invokes the launch actions
+             only when it is checked and this is a new installation, not maintenance. -->
+        <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Run M2 Server"/>
+        <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1"/>
+        <!--
+            Declaring a CustomAction does not run it. UI.wxs schedules these via DoAction.
+            First set the extension's target property; then call its DLL entry point.
+            WixUnelevatedShellExec launches the tray through the unelevated shell so normal
+            desktop usage does not inherit installer elevation. immediate runs during normal
+            sequence processing; Return="ignore" makes launch failure nonfatal to installation.
+        -->
+        <CustomAction Id="SetLaunchTrayTarget" Property="WixUnelevatedShellExecTarget"
+                      Value="[INSTALLFOLDER]M2Server.Tray.exe"/>
+        <CustomAction Id="LaunchTray" BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
+                      DllEntry="WixUnelevatedShellExec" Execute="immediate" Impersonate="yes" Return="ignore"/>
+        <!--
+            RegistrySearch initializes these properties from a previous installation.
+            HKLM is machine-wide; always64 uses the 64-bit registry view. Type="raw" reads
+            the stored value rather than treating it as a file/directory search signature.
+            InstallPreferences below writes the same values for the next installer run.
+        -->
+        <Property Id="INSTALLFOLDER" Secure="yes">
+            <RegistrySearch Id="PreviousInstallFolder" Root="HKLM" Key="Software\0x1000000\M2 Server"
+                            Name="InstallFolder" Type="raw" Bitness="always64"/>
+        </Property>
+        <Property Id="STARTMENU_SHORTCUT" Secure="yes">
+            <RegistrySearch Id="PreviousStartMenu" Root="HKLM" Key="Software\0x1000000\M2 Server"
+                            Name="StartMenuShortcut" Type="raw" Bitness="always64"/>
+        </Property>
+        <Property Id="DESKTOP_SHORTCUT" Secure="yes">
+            <RegistrySearch Id="PreviousDesktop" Root="HKLM" Key="Software\0x1000000\M2 Server" Name="DesktopShortcut"
+                            Type="raw" Bitness="always64"/>
+        </Property>
+        <!--
+            SetProperty generates a property-setting action plus its sequence placement.
+            Supply missing defaults before CostFinalize calculates directory/feature costs:
+            Start menu on, desktop off. Sequence="both" covers the UI and execute sequences,
+            including silent installs. Existing "0" values are nonempty and are preserved.
+        -->
+        <SetProperty Id="STARTMENU_SHORTCUT" Value="1" Before="CostFinalize" Sequence="both"
+                     Condition="NOT STARTMENU_SHORTCUT"/>
+        <SetProperty Id="DESKTOP_SHORTCUT" Value="0" Before="CostFinalize" Sequence="both"
+                     Condition="NOT DESKTOP_SHORTCUT"/>
+        <!-- Wizard checkboxes use separate properties: checked = "1", unchecked = unset.
+             Initialize them from the remembered preferences. UI.wxs maps them back to
+             explicit "1"/"0" preferences when Next is clicked and selects the features. -->
+        <SetProperty Id="M2_STARTMENU_CHECKED" Value="1" After="CostFinalize" Sequence="ui"
+                     Condition="STARTMENU_SHORTCUT = &quot;1&quot;"/>
+        <SetProperty Id="M2_DESKTOP_CHECKED" Value="1" After="CostFinalize" Sequence="ui"
+                     Condition="DESKTOP_SHORTCUT = &quot;1&quot;"/>
+        <!--
+            StandardDirectory names a directory provided by MSI. Directory adds our child
+            folder; the wizard or remembered property can override its resolved path.
+            Component is MSI's install/repair/remove unit. Guid="*" asks WiX to generate its
+            stable component GUID. KeyPath marks the resource MSI checks to detect whether
+            a component is installed; other resources belong to that same component.
+        -->
+        <StandardDirectory Id="ProgramFiles64Folder">
+            <Directory Id="INSTALLFOLDER" Name="$(ProductName)">
+                <Component Id="InstallPreferences" Guid="*" Bitness="always64">
+                    <RegistryValue Root="HKLM" Key="Software\0x1000000\M2 Server" Name="InstallFolder"
+                                   Value="[INSTALLFOLDER]" Type="string" KeyPath="yes"/>
+                    <RegistryValue Root="HKLM" Key="Software\0x1000000\M2 Server" Name="StartMenuShortcut"
+                                   Value="[STARTMENU_SHORTCUT]" Type="string"/>
+                    <RegistryValue Root="HKLM" Key="Software\0x1000000\M2 Server" Name="DesktopShortcut"
+                                   Value="[DESKTOP_SHORTCUT]" Type="string"/>
+                </Component>
+            </Directory>
+        </StandardDirectory>
+        <!--
+            Start menu component: create a normal shortcut to the tray executable, and
+            remove its product menu directory on uninstall when it is empty. WorkingDirectory
+            takes a directory ID, whereas Target is a formatted executable path.
+            The HKCU marker is the component key path (current user's registry hive).
+            A machine-wide package does not make this HKCU marker an all-user registry value.
+        -->
+        <StandardDirectory Id="ProgramMenuFolder">
+            <Directory Id="ProductMenuFolder" Name="$(ProductName)">
+                <Component Id="StartMenuShortcut" Guid="*" Bitness="always64">
+                    <Shortcut Id="StartMenuLink" Name="$(ProductName)" Target="[INSTALLFOLDER]M2Server.Tray.exe"
+                              WorkingDirectory="INSTALLFOLDER" Icon="ProductIcon"/>
+                    <RemoveFolder Id="RemoveProductMenu" On="uninstall"/>
+                    <RegistryValue Root="HKCU" Key="Software\0x1000000\M2 Server" Name="StartMenuInstalled" Value="1"
+                                   Type="integer" KeyPath="yes"/>
+                </Component>
+            </Directory>
+        </StandardDirectory>
+        <!-- Optional desktop shortcut, with its own HKCU key-path marker. MSI removes the
+             shortcut and owned registry values when it removes this component. -->
+        <StandardDirectory Id="DesktopFolder">
+            <Component Id="DesktopShortcut" Guid="*" Bitness="always64">
+                <Shortcut Id="DesktopLink" Name="$(ProductName)" Target="[INSTALLFOLDER]M2Server.Tray.exe"
+                          WorkingDirectory="INSTALLFOLDER" Icon="ProductIcon"/>
+                <RegistryValue Root="HKCU" Key="Software\0x1000000\M2 Server" Name="DesktopInstalled" Value="1"
+                               Type="integer" KeyPath="yes"/>
+            </Component>
+        </StandardDirectory>
+        <!--
+            Features group components into installable choices. ComponentRef includes a
+            component declared elsewhere above; defining a component alone does not select it.
+            With the usual INSTALLLEVEL of 1, level 1 features are selected and level 2 features
+            are not. Nested Level conditions change that selection from the shortcut properties.
+            Display="hidden" hides a feature in a feature tree; it does not prevent installation.
+        -->
+        <Feature Id="MainFeature" Title="$(ProductName)" Level="1">
+            <!-- Files harvests the published out/ tree at build time, generating file/component
+                 authoring under INSTALLFOLDER. Exclude keeps debug files, existing installers,
+                 and the diagnostic sizes report out of the installed payload. -->
+            <Files Include="$(PayloadDir)\**" Directory="INSTALLFOLDER">
+                <Exclude Files="$(PayloadDir)\**.pdb"/>
+                <Exclude Files="$(PayloadDir)\**.msi"/>
+                <Exclude Files="$(PayloadDir)\**.wixpdb"/>
+                <Exclude Files="$(PayloadDir)\avalonia-sizes.txt"/>
+            </Files>
+            <ComponentRef Id="InstallPreferences"/>
+            <Feature Id="StartMenuFeature" Title="Start menu shortcut" Level="1" Display="hidden">
+                <Level Value="2" Condition="STARTMENU_SHORTCUT &lt;&gt; &quot;1&quot;"/>
+                <ComponentRef Id="StartMenuShortcut"/>
+            </Feature>
+            <Feature Id="DesktopFeature" Title="Desktop shortcut" Level="2" Display="hidden">
+                <Level Value="1" Condition="DESKTOP_SHORTCUT = &quot;1&quot;"/>
+                <ComponentRef Id="DesktopShortcut"/>
+            </Feature>
+        </Feature>
+        <!--
+            Binary embeds a private copy of the cleanup-capable web executable in the MSI.
+            BinaryRef actions run that embedded copy, so cleanup does not rely on an installed
+            executable surviving RemoveFiles. The CLI modes are handled by InstallerCleanup.cs.
+        -->
+        <Binary Id="CleanupExecutable" SourceFile="$(PayloadDir)\M2Server.Web.exe"/>
+        <!--
+            Prepare stops installed app processes and removes the service, startup task, and
+            firewall rules before MSI deletes files. deferred runs in the installation script;
+            Impersonate="no" uses the elevated installer context. Return="check" waits and
+            treats an unsuccessful exit as an error. The quoted path preserves spaces; the
+            trailing dot after the directory separator avoids ending the quoted argument with
+            a backslash and still resolves to the installation directory.
+        -->
+        <CustomAction Id="PrepareUninstall" BinaryRef="CleanupExecutable"
+                      ExeCommand="--installer-prepare &quot;[INSTALLFOLDER].&quot;" Execute="deferred" Impersonate="no"
+                      Return="check"/>
+        <!-- Purge removes app data from registered user profiles and ProgramData. Execute="commit"
+             delays this destructive phase until the installation script succeeds. Its sequence
+             row below schedules it; commit execution happens at transaction completion.
+             The external cleanup operations have no rollback custom action in this package. -->
+        <CustomAction Id="PurgeApplicationData" BinaryRef="CleanupExecutable"
+                      ExeCommand="--installer-purge &quot;[INSTALLFOLDER].&quot;" Execute="commit" Impersonate="no"
+                      Return="check"/>
+        <!--
+            This is the execution schedule, not the wizard schedule. Custom refers to a
+            CustomAction by ID; Before/After anchor it to a standard action or another action.
+            Both conditions mean: this product is already installed, all features are being
+            removed, and removal is NOT being performed as part of a major upgrade.
+            Thus fresh installs and repairs skip cleanup, upgrades retain configuration, and
+            an explicit full uninstall always prepares removal; it purges app data only
+            when the user has opted out of preserving configuration.
+        -->
+        <InstallExecuteSequence>
+            <Custom Action="PrepareUninstall" Before="RemoveFiles"
+                    Condition="Installed AND REMOVE = &quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE"/>
+            <Custom Action="PurgeApplicationData" After="PrepareUninstall"
+                    Condition="Installed AND REMOVE = &quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE AND M2_PRESERVE_CONFIG &lt;&gt; &quot;1&quot;"/>
+        </InstallExecuteSequence>
+        <!-- Link the wizard authored in UI.wxs: directory/shortcut selection, maintenance,
+             progress, and optional tray launch on Finish. Silent installs skip this UI. -->
+        <UIRef Id="M2InstallerUI"/>
+    </Package>
+</Wix>

@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net10.0-windows10.0.22000.0</TargetFramework>
+        <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+        <PublishAot>true</PublishAot>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <IsAotCompatible>true</IsAotCompatible>
+        <EnableRequestDelegateGenerator>true</EnableRequestDelegateGenerator>
+        <GenerateEmbeddedFilesManifest>true</GenerateEmbeddedFilesManifest>
+    </PropertyGroup>
+    <ItemGroup>
+        <FrameworkReference Include="Microsoft.AspNetCore.App"/>
+        <PackageReference Include="Microsoft.Extensions.FileProviders.Embedded" Version="10.0.3"/>
+        <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.12"/>
+        <ProjectReference Include="..\M2Server.Lib\M2Server.Lib.csproj"/>
+        <EmbeddedResource Include="..\.tmp\web-dist\mobile\browser\**\*" Link="web\%(RecursiveDir)%(Filename)%(Extension)"/>
+    </ItemGroup>
+    <Target Name="ValidateWebAssets" BeforeTargets="PrepareResources">
+        <Error Condition="!Exists('..\.tmp\web-dist\mobile\browser\index.html')" Text="Build the React app in web/ before building M2Server.Web."/>
+    </Target>
+</Project>
