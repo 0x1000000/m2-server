@@ -2,6 +2,8 @@
 
 M2 Server is a Windows app for switching monitor profiles—from your PC or from a browser on another device. It helps you get the right display setup ready for streaming, and get back to your regular monitors when you are done.
 
+![ScreeShot](doc/ss1.png)
+
 ## Why I built it
 
 I often stream games with Moonlight or play VR games. For streaming, I use a virtual display so I can choose the resolution and refresh rate I need without having to change my physical monitor setup every time.
